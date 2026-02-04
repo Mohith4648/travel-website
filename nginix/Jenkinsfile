@@ -2,82 +2,60 @@ pipeline {
     agent any
 
     environment {
-        // --- SONARQUBE CONFIGURATION ---
-        SONAR_PROJECT_KEY = "Mohith4648_internfile"
-        SONAR_ORG_KEY     = "mohith4648"
-        
-        // --- DOCKER CONFIGURATION ---
-        IMAGE_NAME = "intern-project"
-        TAG = "v1"
-        CRED_ID = "dockerentry" // For your Docker Hub login
+        // --- UPDATED DOCKER REPOSITORY ---
+        DOCKER_USER = "mohith4648"
+        IMAGE_NAME  = "travel-project"
+        TAG         = "v1"
+        CRED_ID     = "dockerentry" // Your Docker Hub credential ID in Jenkins
     }
 
     stages {
         stage('1. Setup & Workspace Cleanup') {
             steps {
                 cleanWs()
-                // Pulls your tourism portal code
+                // Pulls your latest code
                 git branch: 'main', url: 'https://github.com/Mohith4648/internfile.git'
             }
         }
 
-        stage('2. SonarQube Static Analysis') {
+        stage('2. Build & Push Image') {
             steps {
-                // This 'sonar-token' must match the ID you just created in Jenkins Credentials
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    script {
-                        echo "Starting Code Analysis on SonarCloud..."
-                        sh """
-                            docker run --rm \
-                            -v ${WORKSPACE}:/usr/src \
-                            -e SONAR_TOKEN=${SONAR_TOKEN} \
-                            -e SONAR_HOST_URL="https://sonarcloud.io" \
-                            sonarsource/sonar-scanner-cli \
-                            -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} \
-                            -Dsonar.organization=${env.SONAR_ORG_KEY} \
-                            -Dsonar.sources=.
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('3. Build & Push Image') {
-            steps {
+                // Securely fetches your Docker Hub username and password
                 withCredentials([usernamePassword(credentialsId: "${env.CRED_ID}", 
                                  passwordVariable: 'DOCKER_PASS', 
-                                 usernameVariable: 'DOCKER_USER')]) {
+                                 usernameVariable: 'DOCKER_USER_VAR')]) {
                     script {
-                        echo "Building Docker Image for ${DOCKER_USER}..."
-                        sh "docker build -t ${DOCKER_USER}/${env.IMAGE_NAME}:${env.TAG} ."
+                        echo "Building Docker Image: ${DOCKER_USER}/${IMAGE_NAME}:${TAG}..."
+                        sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${TAG} ."
                         
                         echo "Logging into Docker Hub..."
-                        sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin"
+                        sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER_VAR}' --password-stdin"
                         
-                        echo "Pushing Image..."
-                        sh "docker push ${DOCKER_USER}/${env.IMAGE_NAME}:${env.TAG}"
+                        echo "Pushing to new repository: ${DOCKER_USER}/${IMAGE_NAME}..."
+                        sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+                        
                         sh "docker logout"
                     }
                 }
             }
         }
 
-        stage('4. Production Deployment') {
+        stage('3. Production Deployment') {
             steps {
                 withCredentials([usernamePassword(credentialsId: "${env.CRED_ID}", 
                                  passwordVariable: 'DOCKER_PASS', 
-                                 usernameVariable: 'DOCKER_USER')]) {
+                                 usernameVariable: 'DOCKER_USER_VAR')]) {
                     script {
-                        echo "Deploying to Port 8081..."
-                        // Remove old container if it exists
+                        echo "Deploying Travel Project to Port 8081..."
+                        // Force clean old container
                         sh "docker rm -f prod-site || true"
                         
-                        // Run the updated container
-                        sh "docker run -d --name prod-site -p 8081:80 ${DOCKER_USER}/${env.IMAGE_NAME}:${env.TAG}"
+                        // Run the updated container from the new repository
+                        sh "docker run -d --name prod-site -p 8081:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
                         
                         echo "------------------------------------------------------------"
-                        echo "SUCCESS: Build and Deployment Complete!"
-                        echo "Check SonarCloud for results: https://sonarcloud.io/project/overview?id=${env.SONAR_PROJECT_KEY}"
+                        echo "SUCCESS: Travel Project is LIVE at http://localhost:8081"
+                        echo "IMAGE: ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
                         echo "------------------------------------------------------------"
                     }
                 }
