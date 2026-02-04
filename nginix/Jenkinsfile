@@ -31,22 +31,14 @@ pipeline {
             }
         }
 
-        stage('3. Production Deployment') {
-            steps {
-                script {
-                    echo "Stopping any existing travel-site container..."
-                    // This clears out the container name so there is no conflict
-                    sh "docker rm -f travel-site || true"
-                    
-                    echo "Deploying the New Travel Project to Port 82..."
-                    // Changing the port to 82 here
-                    sh "docker run -d --name travel-site -p 82:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
-                    
-                    echo "------------------------------------------------------------"
-                    echo "SUCCESS: Travel Project is now live on http://localhost:82"
-                    echo "------------------------------------------------------------"
-                }
-            }
+       stage('3. Production Deployment') {
+    steps {
+        script {
+            sh "docker rm -f travel-site || true"
+            // The mapping: External:Internal
+            sh "docker run -d --name travel-site -p 82:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
         }
+    }
+}
     }
 }
