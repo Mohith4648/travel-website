@@ -22,7 +22,9 @@ pipeline {
                                  passwordVariable: 'DOCKER_PASS', 
                                  usernameVariable: 'DOCKER_USER_VAR')]) {
                     script {
+                        // Build using the specific Dockerfile inside nginix/
                         sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${TAG} -f nginix/Dockerfile ."
+                        
                         sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER_VAR}' --password-stdin"
                         sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
                         sh "docker logout"
@@ -31,14 +33,22 @@ pipeline {
             }
         }
 
-       stage('3. Production Deployment') {
-    steps {
-        script {
-            sh "docker rm -f travel-site || true"
-            // The mapping: External:Internal
-            sh "docker run -d --name travel-site -p 82:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+        stage('3. Production Deployment') {
+            steps {
+                script {
+                    echo "Cleaning up old containers..."
+                    sh "docker rm -f travel-site || true"
+                    
+                    echo "Deploying the New Travel Project to Port 82..."
+                    // Host Port 82 -> Container Port 80
+                    sh "docker run -d --name travel-site -p 82:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+                    
+                    echo "------------------------------------------------------------"
+                    echo "SUCCESS: Your site is live!"
+                    echo "URL: http://localhost:82"
+                    echo "------------------------------------------------------------"
+                }
+            }
         }
-    }
-}
     }
 }
