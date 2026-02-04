@@ -1,20 +1,20 @@
-
 pipeline {
     agent any
 
     environment {
+        // --- DOCKER REPOSITORY CONFIGURATION ---
         DOCKER_USER = "mohith4648"
         IMAGE_NAME  = "travel-project"
         TAG         = "v1"
-        CRED_ID     = "dockerentry" 
+        CRED_ID     = "dockerentry" // Must match your Jenkins Credentials ID
     }
 
     stages {
         stage('1. Setup & Workspace Cleanup') {
             steps {
                 cleanWs()
-                // Make sure this URL is the one you actually want to build!
-                git branch: 'main', url: 'https://github.com/Mohith4648/internfile.git'
+                // Ensure this is the correct repository URL
+                git branch: 'main', url: 'https://github.com/Mohith4648/travel-website.git'
             }
         }
 
@@ -24,9 +24,18 @@ pipeline {
                                  passwordVariable: 'DOCKER_PASS', 
                                  usernameVariable: 'DOCKER_USER_VAR')]) {
                     script {
-                        sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${TAG} ."
+                        echo "Building Docker Image: ${DOCKER_USER}/${IMAGE_NAME}:${TAG}..."
+                        
+                        // We use -f to specify the Dockerfile inside 'nginix' 
+                        // The '.' at the end keeps the root folder as the context
+                        sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${TAG} -f nginix/Dockerfile ."
+                        
+                        echo "Logging into Docker Hub..."
                         sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER_VAR}' --password-stdin"
+                        
+                        echo "Pushing Image..."
                         sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+                        
                         sh "docker logout"
                     }
                 }
@@ -36,8 +45,16 @@ pipeline {
         stage('3. Production Deployment') {
             steps {
                 script {
-                    sh "docker rm -f prod-site || true"
-                    sh "docker run -d --name prod-site -p 8081:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+                    echo "Deploying to Port 8081..."
+                    // Force remove old container to avoid name conflicts
+                    sh "docker rm -f travel-site || true"
+                    
+                    // Run the container
+                    sh "docker run -d --name travel-site -p 8081:80 ${DOCKER_USER}/${IMAGE_NAME}:${TAG}"
+                    
+                    echo "------------------------------------------------------------"
+                    echo "SUCCESS: Travel Project is LIVE at http://localhost:8081"
+                    echo "------------------------------------------------------------"
                 }
             }
         }
